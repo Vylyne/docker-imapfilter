@@ -21,10 +21,12 @@ vcs_uri() {
     
     # Debug: Confirm whether a username is being used
     if [ -n "$GIT_USER" ]; then
-        printf ">>> DEBUG: Using username in VCS URI (e.g., for GitHub PATs with user:token).\n"
+        # Redirect to STDERR using >&2
+        printf ">>> DEBUG: Using username in VCS URI (e.g., for GitHub PATs with user:token).\n" >&2
         s="${s}${GIT_USER}:"
     else
-        printf ">>> DEBUG: Excluding username from VCS URI (e.g., for token-only auth).\n"
+        # Redirect to STDERR using >&2
+        printf ">>> DEBUG: Excluding username from VCS URI (e.g., for token-only auth).\n" >&2
     fi
 
     # https://[user]:[token]@
@@ -39,9 +41,11 @@ vcs_uri() {
     if [ -n "$token" ]; then
         # Safely mask the token in the debug output
         masked_uri=$(echo "$uri" | sed "s/$token/********/")
-        printf ">>> DEBUG: Constructed VCS URI (masked): %s\n" "$masked_uri"
+        # Redirect to STDERR using >&2
+        printf ">>> DEBUG: Constructed VCS URI (masked): %s\n" "$masked_uri" >&2
     fi
     
+    # ONLY the final, clean URI is printed to STDOUT
     echo "$uri"
 }
 
