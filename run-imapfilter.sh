@@ -2,12 +2,15 @@
 
 vcs_token() {
     if [ -n "$GIT_TOKEN_RAW" ]; then
-        echo "$GIT_TOKEN_RAW"
+        # NEW: Clean the token variable
+        echo "$GIT_TOKEN_RAW" | tr -d '[:space:]'
         return
     fi
 
     if [ -n "$GIT_TOKEN" ]; then
-        cat "${GIT_TOKEN}"
+        # NEW: Read the secret file, pipe to tr to strip ALL whitespace (including newlines)
+        cat "${GIT_TOKEN}" | tr -d '[:space:]'
+        return
     fi
 
     return 1
@@ -15,19 +18,31 @@ vcs_token() {
 
 vcs_uri() {
     s="https://"
+    
+    # Debug: Confirm whether a username is being used
     if [ -n "$GIT_USER" ]; then
-        # https://user:
+        printf ">>> DEBUG: Using username in VCS URI (e.g., for GitHub PATs with user:token).\n"
         s="${s}${GIT_USER}:"
+    else
+        printf ">>> DEBUG: Excluding username from VCS URI (e.g., for token-only auth).\n"
     fi
 
-    # https://user:token@"
+    # https://[user]:[token]@
     token="$(vcs_token)"
     if [ -n "$token" ]; then
         s="${s}${token}@"
     fi
 
-    # https://user:token@target
-    echo "${s}${GIT_TARGET}"
+    uri="${s}${GIT_TARGET}"
+    
+    # Debug: Mask the token and print the URI for troubleshooting
+    if [ -n "$token" ]; then
+        # Safely mask the token in the debug output
+        masked_uri=$(echo "$uri" | sed "s/$token/********/")
+        printf ">>> DEBUG: Constructed VCS URI (masked): %s\n" "$masked_uri"
+    fi
+    
+    echo "$uri"
 }
 
 config_in_vcs() {
@@ -46,25 +61,46 @@ case "$config_target" in
 esac
 
 pull_config() {
-    config_in_vcs || return
-
-    printf ">>> Updating config\n"
-    if [ ! -d "$config_target_base" ]; then
-        printf ">>> Config has not been cloned yet, cloning\n"
-        mkdir -p "$config_target_base"
-        git clone "$(vcs_uri)" "$config_target_base"
-        return
-    else
-        cd "$config_target_base"
-        printf ">>> Pulling config\n"
-        git remote update
-        if [ "$(git rev-parse HEAD)" != "$(git rev-parse FETCH_HEAD)" ]; then
-            git pull
-            return
-        fi
-        cd -
+    # If GIT_TARGET is not defined, we skip VCS operations
+    if ! config_in_vcs; then
+        return 0
     fi
-    return 1
+
+    vcs_url="$(vcs_uri)"
+    
+    # ----------------------------------------------------
+    # NEW: Run git with verbose output and capture STDOUT/STDERR
+    # ----------------------------------------------------
+    printf ">>> INFO: Pulling configuration from VCS...\n"
+    
+    # Run the git command, capture its output and status code
+    # NOTE: --verbose will give more details on the connection/authentication
+    if git -C "$config_target_base" pull --ff-only --verbose "$vcs_url" 2>&1 ; then
+        printf ">>> INFO: Configuration pull succeeded.\n"
+        return 0
+    else
+        # Git failed. The error message is already printed to STDOUT/STDERR 
+        # by the command itself because of '2>&1'.
+        printf ">>> ERROR: Configuration pull failed! See output above for details.\n"
+        
+        # If the failure was due to initial clone, try clone instead of pull
+        if ! [ -d "$config_target_base/.git" ]; then
+            printf ">>> INFO: Directory is not a git repo. Attempting initial clone...\n"
+            
+            # The clone command, also run with verbose output
+            if git clone --verbose "$vcs_url" "$config_target_base" 2>&1 ; then
+                printf ">>> INFO: Initial clone succeeded.\n"
+                return 0
+            else
+                printf ">>> FATAL ERROR: Initial clone failed! Check credentials, URL, and permissions.\n"
+                # Since the configuration is missing, we must exit the script.
+                exit 1
+            fi
+        fi
+        
+        # If it failed a pull, and it IS a repo, we just return an error
+        return 1
+    fi
 }
 
 start_imapfilter() {
