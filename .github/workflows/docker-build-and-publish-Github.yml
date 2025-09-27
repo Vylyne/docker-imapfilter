@@ -25,7 +25,6 @@ on:
   workflow_dispatch:
 
 jobs:
-
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -34,7 +33,7 @@ jobs:
         with:
           dockerfile: Dockerfile
           config: .hadolint.yaml # Restored config file reference
-          
+
   grab-imapfilter-latest:
     needs: lint
     runs-on: ubuntu-latest
@@ -58,8 +57,8 @@ jobs:
           - flavor: |
               latest=false
               suffix= # Suffix is now empty (the default version)
-            args:
-              imapfilter_spec=master
+            args: imapfilter_spec=master
+
           # --- BUILD 2: Latest stable version tag of imapfilter (-stable suffix) ---
           - flavor: |
               latest=false
@@ -106,7 +105,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - uses: docker/build-push-action@v6
         with:
           tags: ${{ steps.meta.outputs.tags }}
