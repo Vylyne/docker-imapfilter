@@ -2,20 +2,29 @@ name: Build and Deploy to Github Packages
 permissions:
   contents: read
   packages: write
-  
+
 on:
   push:
     branches:
-      - '*' # Trigger on push to any branch
+      - "*" # Trigger on push to any branch
+      - "!temp/*" # Exclude Temp braches
+      - "!utility/*" # Exclude Utility branches
+      - "!upstream/*" # Exclude Upstream Branches Really just using them for upstream PRs
+      - "!upstream-main" # current Upstrema PR braanch
+    paths:
+      - Dockerfile
+      - run-imapfilter.sh
+      - docker-entrypoint.sh
   pull_request:
     branches:
-      - '*' # Trigger on PR against any branch
-  schedule:
-    - cron: '0 3 * * *'
+      - "*" # Trigger on PR against any branch
+      - "!temp/*" # Exclude Temp braches
+      - "!utility/*" # Exclude Utility branches
+      - "!upstream/*" # Exclude Upstream Branches Really just using them for upstream PRs
+      - "!upstream-main" # current Upstrema PR braanch
   workflow_dispatch:
 
 jobs:
-
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -46,8 +55,7 @@ jobs:
           - flavor: |
               latest=false
               suffix=
-            args:
-              imapfilter_spec=master
+            args: imapfilter_spec=master
           - flavor: |
               latest=false
               suffix=-tag
@@ -78,10 +86,10 @@ jobs:
 
             # 2. Tag with the branch name (e.g., 'upstream-main' or 'clean') for any branch push
             type=ref,event=branch
-            
+
             # 3. Tag with PR number for pull requests
             type=ref,event=pr
-            
+
             # 4. Tag with short commit SHA
             type=sha,format=short
 
@@ -91,7 +99,7 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - uses: docker/build-push-action@v6
         with:
           tags: ${{ steps.meta.outputs.tags }}
