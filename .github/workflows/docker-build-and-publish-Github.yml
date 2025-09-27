@@ -1,5 +1,8 @@
 name: Build and Deploy to Github Packages
-
+permissions:
+  contents: read
+  packages: write
+  
 on:
   push:
     branches:
