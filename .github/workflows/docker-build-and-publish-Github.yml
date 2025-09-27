@@ -18,7 +18,7 @@ jobs:
       - uses: hadolint/hadolint-action@v3.3.0
         with:
           dockerfile: Dockerfile
-          config: hadolint.yaml # Restored config file reference
+          config: .hadolint.yaml # Restored config file reference
           
   grab-imapfilter-latest:
     needs: lint
