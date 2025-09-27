@@ -128,7 +128,7 @@ jobs:
           # Targets the GHCR repo tied to this GitHub repo
           image-names: ${{ github.repository }}
           # NEW: Required time-based filter. Packages older than 5 hours are candidates for deletion.
-          cut-off: 5h 
+          cut-off: 5hours
           # Using 'keep-n-most-recent' to keep a version count (not days)
           keep-n-most-recent: 4
           # Use 'skip-tags' to protect production tags from deletion
