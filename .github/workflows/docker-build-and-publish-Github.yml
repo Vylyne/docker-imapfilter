@@ -121,7 +121,7 @@ jobs:
       packages: write # Required to delete packages
     steps:
       - name: Delete old packages, keep only 4 versions
-        uses: snok/container-retention-policy@v3
+        uses: snok/container-retention-policy@v3.0.0
         with:
           # Required input to specify if the repository is owned by a user or org
           account-type: personal 
