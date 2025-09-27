@@ -127,8 +127,8 @@ jobs:
           account-type: personal 
           # Targets the GHCR repo tied to this GitHub repo
           image-names: ${{ github.repository }}
-          # Keep the 4 most recently created versions (including the one just built)
-          cut-off: 4
+          # FIX: Replaced 'cut-off: 4' (days) with 'keep-at-least: 4' (versions)
+          keep-at-least: 4
           # FIXED: 'keep-tags' is not supported by v2. Changed to 'skip-tags'.
           skip-tags: latest, main, current
           # Use the default GitHub token for authorization
