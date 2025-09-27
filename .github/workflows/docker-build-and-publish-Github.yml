@@ -49,7 +49,6 @@ jobs:
   build:
     needs: grab-imapfilter-latest
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
         include:
@@ -57,8 +56,8 @@ jobs:
           - flavor: |
               latest=false
               suffix= # Suffix is now empty (the default version)
-            args: imapfilter_spec=master
-
+            args:
+              imapfilter_spec=master
           # --- BUILD 2: Latest stable version tag of imapfilter (-stable suffix) ---
           - flavor: |
               latest=false
@@ -74,7 +73,6 @@ jobs:
           # https://github.com/docker/setup-qemu-action/issues/188
           image: tonistiigi/binfmt:qemu-v8.1.5
       - uses: docker/setup-buildx-action@v3
-
       - name: Extract Docker metadata (tags, labels)
         uses: docker/metadata-action@v5
         id: meta
@@ -112,3 +110,24 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           build-args: ${{ matrix.args }}
+
+  prune_packages:
+    name: Prune Old GHCR Packages
+    needs: build
+    # Only run this cleanup job when pushing directly to 'main'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write # Required to delete packages
+    steps:
+      - name: Delete old packages, keep only 4 versions
+        uses: snok/container-retention-policy@v2
+        with:
+          # Targets the GHCR repo tied to this GitHub repo
+          image-names: ${{ github.repository }}
+          # Keep the 4 most recently created versions (including the one just built)
+          cut-off: 4
+          # ADDED: Explicitly protect these high-value tags from deletion
+          keep-tags: latest, main, current
+          # Use the default GitHub token for authorization
+          token: ${{ secrets.GITHUB_TOKEN }}
