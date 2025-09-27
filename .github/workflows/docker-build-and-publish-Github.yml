@@ -7,8 +7,6 @@ on:
   pull_request:
     branches:
       - '*' # Trigger on PR against any branch
-  schedule:
-    - cron: '0 3 * * *'
   workflow_dispatch:
 
 jobs:
@@ -20,7 +18,8 @@ jobs:
       - uses: hadolint/hadolint-action@v3.3.0
         with:
           dockerfile: Dockerfile
-
+          config: hadolint.yaml # Restored config file reference
+          
   grab-imapfilter-latest:
     needs: lint
     runs-on: ubuntu-latest
@@ -40,14 +39,16 @@ jobs:
     strategy:
       matrix:
         include:
+          # --- BUILD 1: Latest development/master branch of imapfilter (-master suffix) ---
           - flavor: |
               latest=false
-              suffix=
+              suffix=-master # Suffix changed to -master
             args:
               imapfilter_spec=master
+          # --- BUILD 2: Latest stable version tag of imapfilter (-stable suffix) ---
           - flavor: |
               latest=false
-              suffix=-tag
+              suffix=-stable # Suffix changed to -stable
             args: |
               imapfilter_spec=${{ needs.grab-imapfilter-latest.outputs.tag }}
 
@@ -70,17 +71,21 @@ jobs:
             ghcr.io/${{ github.repository }}
           tags: |
             # 1. Tag with 'latest' and 'main' only on push to the 'main' branch (not PRs)
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
-            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+            # These tags now check for the '-stable' suffix.
+            type=raw,value=latest,enable=${{ matrix.flavor.suffix == '-stable' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+            type=raw,value=main,enable=${{ matrix.flavor.suffix == '-stable' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
 
-            # 2. Tag with the branch name (e.g., 'upstream-main' or 'clean') for any branch push
+            # 2. Tag with 'current' only on push to the 'main' branch and for the master build
+            # This tag now checks for the '-master' suffix.
+            type=raw,value=current,enable=${{ matrix.flavor.suffix == '-master' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+
+            # 3. Tag with the branch name (e.g., 'my-feature-master' or 'my-feature-stable')
             type=ref,event=branch
             
-            # 3. Tag with PR number for pull requests
+            # 4. Tag with PR number for pull requests
             type=ref,event=pr
             
-            # 4. Tag with short commit SHA
-            type=sha,format=short
+            # 5. REMOVED: Short commit SHA tag is no longer included to reduce clutter
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
