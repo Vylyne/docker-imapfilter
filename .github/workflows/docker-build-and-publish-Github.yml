@@ -58,6 +58,7 @@ jobs:
               latest=false
               suffix= # Suffix is now empty (the default version)
             args: imapfilter_spec=master
+
           # --- BUILD 2: Latest stable version tag of imapfilter (-stable suffix) ---
           - flavor: |
               latest=false
