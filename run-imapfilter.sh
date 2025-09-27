@@ -17,36 +17,33 @@ vcs_token() {
 }
 
 vcs_uri() {
-    s="https://"
-    
-    # Debug: Confirm whether a username is being used
+    s="https://" # Default protocol prefix
+
+    # 1. Add Auth details to $s: [https://] + [user:token@]
     if [ -n "$GIT_USER" ]; then
-        # Redirect to STDERR using >&2
-        printf ">>> DEBUG: Using username in VCS URI (e.g., for GitHub PATs with user:token).\n" >&2
         s="${s}${GIT_USER}:"
-    else
-        # Redirect to STDERR using >&2
-        printf ">>> DEBUG: Excluding username from VCS URI (e.g., for token-only auth).\n" >&2
     fi
 
-    # https://[user]:[token]@
+    # Token is cleaned here (in vcs_token)
     token="$(vcs_token)"
     if [ -n "$token" ]; then
         s="${s}${token}@"
     fi
 
-    uri="${s}${GIT_TARGET}"
+    # 2. Strip protocol from $GIT_TARGET if one exists
+    local target_clean="$GIT_TARGET"
     
-    # Debug: Mask the token and print the URI for troubleshooting
-    if [ -n "$token" ]; then
-        # Safely mask the token in the debug output
-        masked_uri=$(echo "$uri" | sed "s/$token/********/")
-        # Redirect to STDERR using >&2
-        printf ">>> DEBUG: Constructed VCS URI (masked): %s\n" "$masked_uri" >&2
-    fi
-    
-    # ONLY the final, clean URI is printed to STDOUT
-    echo "$uri"
+    # Check if $GIT_TARGET starts with any protocol followed by '://'
+    case "$GIT_TARGET" in
+        *://*)
+            # Remove the protocol prefix from the target
+            target_clean="${GIT_TARGET#*://}"
+            ;;
+    esac
+
+    # 3. Final URI is returned
+    # [https://user:token@] + [clean target]
+    echo "${s}${target_clean}"
 }
 
 config_in_vcs() {
@@ -72,37 +69,32 @@ pull_config() {
 
     vcs_url="$(vcs_uri)"
     
-    # ----------------------------------------------------
-    # NEW: Run git with verbose output and capture STDOUT/STDERR
-    # ----------------------------------------------------
-    printf ">>> INFO: Pulling configuration from VCS...\n"
+    printf ">>> INFO: Checking for config updates...\n"
     
     # Run the git command, capture its output and status code
-    # NOTE: --verbose will give more details on the connection/authentication
+    # NOTE: --verbose is added to aid in troubleshooting future issues
     if git -C "$config_target_base" pull --ff-only --verbose "$vcs_url" 2>&1 ; then
-        printf ">>> INFO: Configuration pull succeeded.\n"
+        # On success, Git will print 'Already up to date.' or transfer details.
         return 0
     else
-        # Git failed. The error message is already printed to STDOUT/STDERR 
-        # by the command itself because of '2>&1'.
-        printf ">>> ERROR: Configuration pull failed! See output above for details.\n"
+        # Git failed.
+        printf ">>> ERROR: Configuration pull failed! Attempting initial clone...\n" >&2
         
         # If the failure was due to initial clone, try clone instead of pull
         if ! [ -d "$config_target_base/.git" ]; then
-            printf ">>> INFO: Directory is not a git repo. Attempting initial clone...\n"
             
             # The clone command, also run with verbose output
             if git clone --verbose "$vcs_url" "$config_target_base" 2>&1 ; then
-                printf ">>> INFO: Initial clone succeeded.\n"
+                printf ">>> INFO: Initial config clone succeeded.\n" >&2
                 return 0
             else
-                printf ">>> FATAL ERROR: Initial clone failed! Check credentials, URL, and permissions.\n"
+                printf ">>> FATAL: Initial config clone failed. Check credentials/URL.\n" >&2
                 # Since the configuration is missing, we must exit the script.
                 exit 1
             fi
         fi
         
-        # If it failed a pull, and it IS a repo, we just return an error
+        # If it failed a pull, and it IS a repo, we return an error.
         return 1
     fi
 }
@@ -111,8 +103,8 @@ start_imapfilter() {
     # enter a subshell to not affect the pwd of the running process
     (
         if ! [ -d "$config_target_base" ]; then
-            echo "The directory '$config_target_base' does not exist, exiting"
-            echo "Please validate IMAPFILTER_CONFIG_BASE"
+            echo ">>> The directory '$config_target_base' does not exist, exiting"
+            echo ">>> Please validate IMAPFILTER_CONFIG_BASE"
             exit 1
         fi
 
@@ -126,8 +118,8 @@ start_imapfilter() {
         fi
 
         if ! [ -f "$config_target" ]; then
-            echo "The file '$config_target' does not exist relative to '$config_target_base', exiting"
-            echo "Please validate IMAPFILTER_CONFIG"
+            echo ">>> The file '$config_target' does not exist relative to '$config_target_base', exiting"
+            echo ">>> Please validate IMAPFILTER_CONFIG"
             exit 1
         fi
 
