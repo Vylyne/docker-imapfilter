@@ -114,8 +114,8 @@ jobs:
   prune_packages:
     name: Prune Old GHCR Packages
     needs: build
-    # Only run this cleanup job when pushing directly to 'main' OR running manually via workflow_dispatch
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    # Only run this cleanup job when pushing directly to 'main' OR running manually via workflow_dispatch OR on schedule
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')
     runs-on: ubuntu-latest
     permissions:
       packages: write # Required to delete packages
@@ -123,13 +123,15 @@ jobs:
       - name: Delete old packages, keep only 4 versions
         uses: snok/container-retention-policy@v2
         with:
-          # NEW: Required input to specify if the repository is owned by a user or org
+          # Required input to specify if the repository is owned by a user or org
           account-type: personal 
           # Targets the GHCR repo tied to this GitHub repo
           image-names: ${{ github.repository }}
-          # FIX: Replaced 'cut-off: 4' (days) with 'keep-at-least: 4' (versions)
-          keep-at-least: 4
-          # FIXED: 'keep-tags' is not supported by v2. Changed to 'skip-tags'.
+          # NEW: Required time-based filter. Packages older than 5 hours are candidates for deletion.
+          cut-off: 5h 
+          # Using 'keep-n-most-recent' to keep a version count (not days)
+          keep-n-most-recent: 4
+          # Use 'skip-tags' to protect production tags from deletion
           skip-tags: latest, main, current
           # Use the default GitHub token for authorization
           token: ${{ secrets.GITHUB_TOKEN }}
