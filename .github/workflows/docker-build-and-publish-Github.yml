@@ -123,15 +123,9 @@ jobs:
       - name: Delete old packages, keep only 4 versions
         uses: snok/container-retention-policy@v3.0.0
         with:
-          # Required input to specify if the repository is owned by a user or org
-          account-type: personal 
-          # Targets the GHCR repo tied to this GitHub repo
+          account: user 
           image-names: ${{ github.repository }}
-          # NEW: Required time-based filter. Packages older than 5 hours are candidates for deletion.
           cut-off: 5hours
-          # Using 'keep-n-most-recent' to keep a version count (not days)
           keep-n-most-recent: 4
-          # Use 'skip-tags' to protect production tags from deletion
           skip-tags: latest, main, current
-          # Use the default GitHub token for authorization
           token: ${{ secrets.GITHUB_TOKEN }}
