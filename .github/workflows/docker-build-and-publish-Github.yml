@@ -2,14 +2,26 @@ name: Build and Deploy to Github Packages
 permissions:
   contents: read
   packages: write
-  
+
 on:
   push:
     branches:
-      - '*' # Trigger on push to any branch
+      - "*" # Trigger on push to any branch
+      - "!temp/*" # Exclude Temp braches
+      - "!utility/*" # Exclude Utility branches
+      - "!upstream/*" # Exclude Upstream Branches Really just using them for upstream PRs
+      - "!upstream-main" # current Upstrema PR braanch
+    paths:
+      - Dockerfile
+      - run-imapfilter.sh
+      - docker-entrypoint.sh
   pull_request:
     branches:
-      - '*' # Trigger on PR against any branch
+      - "*" # Trigger on PR against any branch
+      - "!temp/*" # Exclude Temp braches
+      - "!utility/*" # Exclude Utility branches
+      - "!upstream/*" # Exclude Upstream Branches Really just using them for upstream PRs
+      - "!upstream-main" # current Upstrema PR braanch
   workflow_dispatch:
 
 jobs:
@@ -42,16 +54,16 @@ jobs:
     strategy:
       matrix:
         include:
-          # --- BUILD 1: Latest development/master branch of imapfilter (-master suffix) ---
+          # --- BUILD 1: Latest development/master branch of imapfilter (No suffix) ---
           - flavor: |
               latest=false
-              suffix=-master # Suffix changed to -master
+              suffix= # Suffix is now empty (the default version)
             args:
               imapfilter_spec=master
           # --- BUILD 2: Latest stable version tag of imapfilter (-stable suffix) ---
           - flavor: |
               latest=false
-              suffix=-stable # Suffix changed to -stable
+              suffix=-stable # Suffix clearly indicates stable release tag
             args: |
               imapfilter_spec=${{ needs.grab-imapfilter-latest.outputs.tag }}
 
@@ -79,16 +91,14 @@ jobs:
             type=raw,value=main,enable=${{ matrix.flavor.suffix == '-stable' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
 
             # 2. Tag with 'current' only on push to the 'main' branch and for the master build
-            # This tag now checks for the '-master' suffix.
-            type=raw,value=current,enable=${{ matrix.flavor.suffix == '-master' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+            # This tag now checks for the EMPTY suffix (the default build).
+            type=raw,value=current,enable=${{ matrix.flavor.suffix == '' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
 
-            # 3. Tag with the branch name (e.g., 'my-feature-master' or 'my-feature-stable')
+            # 3. Tag with the branch name (e.g., 'my-feature' or 'my-feature-stable')
             type=ref,event=branch
-            
+
             # 4. Tag with PR number for pull requests
             type=ref,event=pr
-            
-            # 5. REMOVED: Short commit SHA tag is no longer included to reduce clutter
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
