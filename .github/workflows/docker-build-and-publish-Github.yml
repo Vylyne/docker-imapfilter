@@ -1,4 +1,4 @@
-name: Build and Deploy to Github Packages
+name: Build and Deploy Packages
 permissions:
   contents: read
   packages: write
