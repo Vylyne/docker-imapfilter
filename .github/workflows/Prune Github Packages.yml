@@ -19,6 +19,6 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           image-names: ${{ github.event.repository.name }}
           image-tags: "!latest !current !main !main-stable"
-          cut-off: 5h
+          cut-off: 10min
           keep-n-most-recent: 4
           dry-run: false
