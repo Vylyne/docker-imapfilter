@@ -89,7 +89,7 @@ jobs:
             # Primary target: GitHub Container Registry (GHCR)
             ghcr.io/${{ github.repository }}
             # Secondary target: Docker Hub (Only push on main branch push/dispatch)
-            ${{ (github.ref == 'refs/heads/main' && github.event_name != 'pull_request') && format('docker.io/{0}/{1}', secrets.DOCKER_HUB_USER, github.event.repository.name) || '' }}
+            ${{ (github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')) && format('docker.io/{0}/{1}', secrets.DOCKER_HUB_USER, github.event.repository.name) || '' }}
           tags: |
             # 1. Tag with 'latest' and 'main' only on push, dispatch, or schedule to the 'main' branch (and -stable suffix)
             type=raw,value=latest,enable=${{ matrix.flavor.suffix == '-stable' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
