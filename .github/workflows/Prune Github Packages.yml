@@ -15,9 +15,9 @@ jobs:
       - name: Delete old packages, keep only 4 versions
         uses: snok/container-retention-policy@v3.0.0
         with:
-          account: ${{ github.repository_owner }}
+          account: user
           token: ${{ secrets.GITHUB_TOKEN }}
-          image-names: ${{ github.repository }}
+          image-names: ${{ github.event.repository.name }}
           image-tags: "!latest !current !main !main-stable"
           cut-off: 5h
           keep-n-most-recent: 4
