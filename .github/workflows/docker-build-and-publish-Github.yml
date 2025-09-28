@@ -127,5 +127,5 @@ jobs:
           image-names: ${{ github.repository }}
           cut-off: 5hours
           keep-n-most-recent: 4
-          skip-tags: latest, main, current
+          tags-names: "!latest !current !main !main-stable"
           token: ${{ secrets.GITHUB_TOKEN }}
