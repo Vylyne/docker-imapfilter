@@ -31,19 +31,20 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: hadolint/hadolint-action@v3.3.0
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+      - uses: hadolint/hadolint-action@2332a7b74a6de0dda2e2221d575162eba76ba5e5 # v3.3.0
         with:
           dockerfile: Dockerfile
-          config: .hadolint.yaml # Restored config file reference
-          
+
   grab-imapfilter-latest:
     needs: lint
     runs-on: ubuntu-latest
     steps:
       - id: imapfilter-latest-tag
         run: |
-          # Fetch the latest tag from the upstream imapfilter repository
+          # Can't find an endpoint that returns the latest tag - only
+          # the latest release. And since lefcha doesn't use GitHub's
+          # release feature the tags must be used.
           tag="$(curl --location --silent https://api.github.com/repos/lefcha/imapfilter/tags | jq -r '.[].name' | head -1)"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
     outputs:
@@ -52,74 +53,59 @@ jobs:
   build:
     needs: grab-imapfilter-latest
     runs-on: ubuntu-latest
-    # Ensure scheduled runs only proceed if they are on the 'main' branch
-    if: github.event_name != 'schedule' || github.ref == 'refs/heads/main'
 
     strategy:
       matrix:
         include:
-          # --- BUILD 1: Latest development/master branch of imapfilter (No suffix) ---
           - flavor: |
               latest=false
-              suffix= # Suffix is now empty (the default version)
+              suffix=
             args:
               imapfilter_spec=master
-          # --- BUILD 2: Latest stable version tag of imapfilter (-stable suffix) ---
           - flavor: |
               latest=false
-              suffix=-stable # Suffix clearly indicates stable release tag
+              suffix=-tag
             args: |
               imapfilter_spec=${{ needs.grab-imapfilter-latest.outputs.tag }}
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+      - uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3
         with:
           # Spurious segfaults when compiling
           # https://github.com/docker/setup-qemu-action/issues/188
           image: tonistiigi/binfmt:qemu-v8.1.5
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3
 
-      - name: Extract Docker metadata (tags, labels)
-        uses: docker/metadata-action@v5
+      - uses: docker/metadata-action@c1e51972afc2121e065aed6d45c65596fe445f3f # v5
         id: meta
         with:
           flavor: ${{ matrix.flavor }}
           images: |
-            # Primary target: GitHub Container Registry (GHCR)
-            ghcr.io/${{ github.repository }}
-            # Secondary target: Docker Hub (Only push on main branch push/dispatch)
-            ${{ (github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule')) && format('docker.io/{0}/{1}', secrets.DOCKER_HUB_USER, github.event.repository.name) || '' }}
+            name=ntnn/imapfilter,enable=${{ github.repository == 'ntnn/docker-imapfilter' && github.ref == 'refs/heads/main' }}
+            name=ghcr.io/${{ github.repository }},enable=true
           tags: |
-            # 1. Tag with 'latest' and 'main' only on push, dispatch, or schedule to the 'main' branch (and -stable suffix)
-            type=raw,value=latest,enable=${{ matrix.flavor.suffix == '-stable' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
-            type=raw,value=main,enable=${{ matrix.flavor.suffix == '-stable' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
-
-            # 2. Tag with 'current' only on push, dispatch, or schedule to the 'main' branch (and no suffix)
-            type=raw,value=current,enable=${{ matrix.flavor.suffix == '' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule') }}
-
-            # 3. Tag with the branch name (e.g., 'my-feature' or 'my-feature-stable')
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=main,enable=${{ github.ref == 'refs/heads/main' }}
             type=ref,event=branch
-
-            # 4. Tag with PR number for pull requests
             type=ref,event=pr
+            type=sha
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Login to Docker Hub
-        # Only attempt to log in if the image metadata step generated a Docker Hub tag
-        if: contains(steps.meta.outputs.tags, 'docker.io')
-        uses: docker/login-action@v3
+        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3
+        if: ${{ github.repository == 'ntnn/docker-imapfilter' && github.ref == 'refs/heads/main' }}
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
-          
-      - uses: docker/build-push-action@v6
+
+      - uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6
         with:
           tags: ${{ steps.meta.outputs.tags }}
           push: true
