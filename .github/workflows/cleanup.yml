@@ -1,0 +1,24 @@
+name: Build and Deploy to Github Packages
+permissions:
+  packages: write # Required to delete packages
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "5 4 * * *" 
+
+jobs:
+  prune_packages:
+    name: Prune Old GHCR Packages
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete old packages, keep only 4 versions
+        uses: snok/container-retention-policy@v3.0.0
+        with:
+          account: user
+          token: ${{ secrets.GITHUB_TOKEN }}
+          image-names: ${{ github.repository }}
+          image-tags: "!latest !current !main !main-stable"
+          cut-off: 5h
+          keep-n-most-recent: 4
+          dry-run: false
