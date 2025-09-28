@@ -1,4 +1,4 @@
-name: Build and Deploy to Github Packages
+name: Prune Github Packages
 permissions:
   packages: write # Required to delete packages
 on:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   prune_packages:
-    name: Prune Old GHCR Packages
+    name: Prune Github Packages
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
