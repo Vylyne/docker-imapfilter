@@ -6,27 +6,17 @@ permissions:
 on:
   push:
     branches:
-      - "*" # Trigger on push to any branch
-      - "!temp/*" # Exclude Temp braches
-      - "!utility/*" # Exclude Utility branches
-      - "!pr/*" # PR braanch
-    paths:
-      - Dockerfile
-      - run-imapfilter.sh
-      - docker-entrypoint.sh
+      - main
+      - dev/* # for testing
   pull_request:
     branches:
-      - "*" # Trigger on PR against any branch
-      - "!temp/*" # Exclude Temp braches
-      - "!utility/*" # Exclude Utility branches
-      - "!upstream/*" # Exclude Upstream Branches Really just using them for upstream PRs
-      - "!upstream-main" # current Upstrema PR braanch
+      - main
+      - dev/* # for testing
   schedule:
-    - cron: '0 3 * * *' # Re-adding the daily check for new upstream imapfilter tags
+    - cron: "0 3 * * *"
   workflow_dispatch:
 
 jobs:
-
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -59,8 +49,7 @@ jobs:
           - flavor: |
               latest=false
               suffix=
-            args:
-              imapfilter_spec=master
+            args: imapfilter_spec=master
           - flavor: |
               latest=false
               suffix=-stable
@@ -79,8 +68,9 @@ jobs:
         id: meta
         with:
           flavor: ${{ matrix.flavor }}
-          images: |
-            name=${{ secrets.DOCKER_HUB_USERNAME }}/${{ github.repository.name }},enable=${{ github.ref == 'refs/heads/main' && secrets.DOCKER_HUB_USERNAME != '' && secrets.DOCKER_HUB_TOKEN != '' }}
+          images:
+            | # secrets for Docker hub username and token should be in the registry settings if not docker hub push will be skipped.
+            name=${{ secrets.DOCKER_HUB_USERNAME }}/imapfilter,enable=${{ github.ref == 'refs/heads/main' && secrets.DOCKER_HUB_USERNAME != '' && secrets.DOCKER_HUB_TOKEN != '' }}
             name=ghcr.io/${{ github.repository }},enable=true
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
@@ -98,9 +88,9 @@ jobs:
 
       - name: Login to Docker Hub
         uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3
-        env:
-          DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
-          DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN }}
+        env: # secrets for Docker hub username and token should be in the registry settings if not docker hub push will be skipped.
+          DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME || '' }}
+          DOCKER_HUB_TOKEN: ${{ secrets.DOCKER_HUB_TOKEN || '' }}
         if: ${{ github.ref == 'refs/heads/main' && env.DOCKER_HUB_USERNAME != '' && env.DOCKER_HUB_TOKEN != '' }}
         with:
           username: ${{ env.DOCKER_HUB_USERNAME }}
