@@ -125,7 +125,7 @@ loop_daemon() {
 
 	while true; do
 		# For debugging, show all imapfilter processes the daemon is running
-		printf ">>> imapfilter processes:\n"
+		printf ">>> imapfilter processes (expected PID $imapfilter_pid):\n"
 		ps -A | grep 'imapfilter' | grep -v 'grep'
 		if pull_config; then
 			printf ">>> Update in VCS, restarting imapfilter daemon\n"
