@@ -95,14 +95,39 @@ start_imapfilter() {
 	)
 }
 
-imapfilter_pid=
+get_imapfilter_pids() {
+	ps -A -o pid,comm | grep imapfilter | grep -v grep | awk '{print $1}'
+}
+
 imapfilter_restart_daemon() {
-	if [ -n "$imapfilter_pid" ]; then
-		kill -TERM "$imapfilter_pid"
-		wait "$imapfilter_pid"
+	pids=$(get_imapfilter_pids)
+	
+	if [ -n "$pids" ]; then
+		printf ">>> Stopping imapfilter processes: %s\n" "$pids"
+		
+		# Send TERM to all
+		for pid in $pids; do
+			kill -TERM "$pid" 2>/dev/null
+		done
+		
+		# Wait for each process with timeout
+		for pid in $pids; do
+			timeout=10
+			while [ $timeout -gt 0 ] && kill -0 "$pid" 2>/dev/null; do
+				sleep 1
+				timeout=$((timeout - 1))
+			done
+			
+			# Force kill if still alive
+			if kill -0 "$pid" 2>/dev/null; then
+				printf ">>> Force killing PID %s\n" "$pid"
+				kill -KILL "$pid" 2>/dev/null
+			fi
+		done
 	fi
+	
 	start_imapfilter &
-	imapfilter_pid="$(jobs -p)"
+	imapfilter_pid=$!
 }
 
 loop_no_daemon() {
@@ -124,9 +149,9 @@ loop_daemon() {
 	imapfilter_restart_daemon
 
 	while true; do
-		# For debugging, show all imapfilter processes the daemon is running
-		printf ">>> imapfilter processes (expected PID $imapfilter_pid):\n"
+		printf ">>> imapfilter processes:\n"
 		ps -A | grep 'imapfilter' | grep -v 'grep'
+		
 		if pull_config; then
 			printf ">>> Update in VCS, restarting imapfilter daemon\n"
 			imapfilter_restart_daemon
@@ -135,8 +160,9 @@ loop_daemon() {
 		printf ">>> Sleeping\n"
 		sleep "${IMAPFILTER_SLEEP:-30}"
 
-		if ! kill -0 "$imapfilter_pid" 2>/dev/null; then
-			printf ">>> imapfilter daemon died, exiting\n"
+		# Check if any imapfilter is still running
+		if [ -z "$(get_imapfilter_pids)" ]; then
+			printf ">>> No imapfilter processes found, exiting\n"
 			exit 1
 		fi
 	done
