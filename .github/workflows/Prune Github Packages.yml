@@ -1,6 +1,7 @@
 name: Prune Github Packages
 permissions:
-  packages: write # Required to delete packages
+  packages: write
+  contents: read # Need this to fetch branches
 on:
   workflow_dispatch:
   schedule:
@@ -12,13 +13,36 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - name: Delete old packages, keep only 4 versions
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch all branches
+      
+      - name: Build exclusion list from active branches
+        id: branches
+        run: |
+          # Get all remote branch names (without refs/remotes/origin/)
+          branches=$(git branch -r | sed 's/origin\///' | awk '{print $1}' | grep -v HEAD | tr '\n' ' ')
+          
+          # Build the exclusion pattern with wildcard
+          exclusions=""
+          for branch in $branches; do
+            exclusions="$exclusions !${branch}*"
+          done
+          
+          # Always keep latest and current
+          exclusions="!latest !current $exclusions"
+          
+          echo "exclusions=$exclusions" >> $GITHUB_OUTPUT
+          echo "Excluding tags: $exclusions"
+      
+      - name: Delete old packages
         uses: snok/container-retention-policy@v3.0.0
         with:
           account: user
           token: ${{ secrets.GITHUB_TOKEN }}
           image-names: ${{ github.event.repository.name }}
-          image-tags: "!latest !current !main !main-stable"
+          image-tags: ${{ steps.branches.outputs.exclusions }}
           cut-off: 10min
           keep-n-most-recent: 4
           dry-run: false
