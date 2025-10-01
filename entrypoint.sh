@@ -48,15 +48,15 @@ esac
 pull_config() {
 	config_in_vcs || return
 
-	printf ">>> Updating config\n"
+	printf "Supervisor:  Updating config\n"
 	if [ ! -d "$config_target_base" ]; then
-		printf ">>> Config has not been cloned yet, cloning\n"
+		printf "Supervisor:  Config has not been cloned yet, cloning\n"
 		mkdir -p "$config_target_base"
 		git clone "$(vcs_uri)" "$config_target_base"
 		return
 	else
 		cd "$config_target_base"
-		printf ">>> Pulling config\n"
+		printf "Supervisor:  Pulling config\n"
 		git remote update
 		if [ "$(git rev-parse HEAD)" != "$(git rev-parse FETCH_HEAD)" ]; then
 			git pull
@@ -103,7 +103,7 @@ imapfilter_restart_daemon() {
 	pids=$(get_imapfilter_pids)
 
 	if [ -n "$pids" ]; then
-		printf ">>> Stopping imapfilter processes: %s\n" "$pids"
+		printf "Supervisor:  Stopping imapfilter processes: %s\n" "$pids"
 
 		# Send TERM to all
 		for pid in $pids; do
@@ -121,7 +121,7 @@ imapfilter_restart_daemon() {
 			done
 
 			if [ -z "$still_alive" ]; then
-				printf ">>> All imapfilter processes stopped gracefully\n"
+				printf "Supervisor:  All imapfilter processes stopped gracefully\n"
 				break
 			fi
 
@@ -133,7 +133,7 @@ imapfilter_restart_daemon() {
 		if [ -n "$still_alive" ]; then
 			remaining=$(get_imapfilter_pids)
 			if [ -n "$remaining" ]; then
-				printf ">>> Force killing remaining processes: %s\n" "$remaining"
+				printf "Supervisor:  Force killing remaining processes: %s\n" "$remaining"
 				for pid in $remaining; do
 					kill -KILL "$pid" 2>/dev/null
 				done
@@ -150,13 +150,13 @@ loop_no_daemon() {
 	while true; do
 		pull_config
 
-		printf ">>> Running imapfilter\n"
+		printf "Supervisor:  Running imapfilter\n"
 		if ! start_imapfilter; then
-			printf ">>> imapfilter failed\n"
+			printf "Supervisor:  imapfilter failed\n"
 			exit 1
 		fi
 
-		printf ">>> Sleeping\n"
+		printf "Supervisor:  Sleeping\n"
 		sleep "${IMAPFILTER_SLEEP:-30}"
 	done
 }
@@ -165,20 +165,17 @@ loop_daemon() {
 	imapfilter_restart_daemon
 
 	while true; do
-		printf ">>> imapfilter processes:\n"
-		ps -A | grep 'imapfilter' | grep -v 'grep'
-
 		if pull_config; then
-			printf ">>> Update in VCS, restarting imapfilter daemon\n"
+			printf "Supervisor:  Update in VCS, restarting imapfilter daemon\n"
 			imapfilter_restart_daemon
 		fi
 
-		printf ">>> Sleeping\n"
+		printf "Supervisor:  Sleeping\n"
 		sleep "${IMAPFILTER_SLEEP:-30}"
 
 		# Check if any imapfilter is still running
 		if [ -z "$(get_imapfilter_pids)" ]; then
-			printf ">>> No imapfilter processes found, exiting\n"
+			printf "Supervisor:  No imapfilter processes found, exiting\n"
 			exit 1
 		fi
 	done
